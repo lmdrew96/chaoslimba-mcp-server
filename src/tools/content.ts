@@ -67,19 +67,30 @@ export function registerContentTools(server: McpServer): void {
         `;
         params.push(limit);
       } else {
-        // No difficulty filter: stratify across difficulty levels for even coverage
+        // No difficulty filter: stratify across CEFR levels for even coverage.
+        // Mapping: A1 ≤2.0, A2 2.1–3.5, B1 3.6–5.0, B2 5.1–7.0, C1 7.1–9.0, C2 9.1+
         sql = `
           SELECT id, type, title, difficulty_level, topic, language_features, duration_seconds, created_at
           FROM (
             SELECT *,
-              ROW_NUMBER() OVER (PARTITION BY FLOOR(difficulty_level) ORDER BY created_at) AS rn
+              ROW_NUMBER() OVER (
+                PARTITION BY CASE
+                  WHEN difficulty_level <= 2.0 THEN 'A1'
+                  WHEN difficulty_level <= 3.5 THEN 'A2'
+                  WHEN difficulty_level <= 5.0 THEN 'B1'
+                  WHEN difficulty_level <= 7.0 THEN 'B2'
+                  WHEN difficulty_level <= 9.0 THEN 'C1'
+                  ELSE 'C2'
+                END
+                ORDER BY created_at
+              ) AS rn
             FROM content_items
             ${whereClause}
           ) ranked
           WHERE rn <= $${paramIndex}
           ORDER BY difficulty_level, created_at
         `;
-        // Divide limit evenly across 6 difficulty buckets, rounding up
+        // Divide limit evenly across 6 CEFR levels, rounding up
         params.push(Math.ceil(limit / 6));
       }
 
