@@ -4,6 +4,9 @@ import { registerSchemaTools } from './tools/schema.js';
 import { registerGrammarTools } from './tools/grammar.js';
 import { registerContentTools } from './tools/content.js';
 import { registerErrorTools } from './tools/errors.js';
+import { registerExerciseTools } from './tools/exercises.js';
+import { registerLearnerDataTools } from './tools/learner-data.js';
+import { registerUsageTools } from './tools/usage.js';
 
 const server = new McpServer({
   name: 'chaoslimba-mcp-server',
@@ -14,6 +17,9 @@ registerSchemaTools(server);
 registerGrammarTools(server);
 registerContentTools(server);
 registerErrorTools(server);
+registerExerciseTools(server);
+registerLearnerDataTools(server);
+registerUsageTools(server);
 
 async function main(): Promise<void> {
   const transport = new StdioServerTransport();
