@@ -9,7 +9,7 @@ export function registerContentTools(server: McpServer): void {
     {
       title: 'Get Content Items',
       description:
-        'Returns content items, optionally filtered by difficulty level, topic, or type. Useful for browsing the content library.',
+        'Returns content items, optionally filtered by difficulty level, topic, or type. When no difficulty filter is set, results are stratified across difficulty levels for even coverage.',
       inputSchema: z.object({
         difficultyLevel: z
           .number()
@@ -19,41 +19,69 @@ export function registerContentTools(server: McpServer): void {
           .describe('Filter by exact difficulty level (1.0–6.0)'),
         topic: z.string().optional().describe('Filter by topic (partial match, case-insensitive)'),
         type: z.enum(['audio', 'text']).optional().describe('Filter by content type'),
-        limit: z.number().min(1).max(100).default(20).describe('Max results to return (default 20)'),
+        limit: z.number().min(1).default(50).describe('Max results to return (default 50)'),
       }),
       annotations: {
         readOnlyHint: true,
       },
     },
     async ({ difficultyLevel, topic, type, limit }) => {
-      let sql = `
-        SELECT id, type, title, difficulty_level, topic, language_features, duration_seconds, created_at
-        FROM content_items
-        WHERE 1=1
-      `;
       const params: unknown[] = [];
       let paramIndex = 1;
 
+      // Build WHERE clauses
+      const conditions: string[] = [];
+
       if (difficultyLevel !== undefined) {
-        sql += ` AND difficulty_level = $${paramIndex}`;
+        conditions.push(`difficulty_level = $${paramIndex}`);
         params.push(difficultyLevel);
         paramIndex++;
       }
 
       if (topic) {
-        sql += ` AND topic ILIKE $${paramIndex}`;
+        conditions.push(`topic ILIKE $${paramIndex}`);
         params.push(`%${topic}%`);
         paramIndex++;
       }
 
       if (type) {
-        sql += ` AND type = $${paramIndex}`;
+        conditions.push(`type = $${paramIndex}`);
         params.push(type);
         paramIndex++;
       }
 
-      sql += ` ORDER BY difficulty_level, created_at LIMIT $${paramIndex}`;
-      params.push(limit);
+      const whereClause = conditions.length > 0
+        ? `WHERE ${conditions.join(' AND ')}`
+        : '';
+
+      let sql: string;
+
+      if (difficultyLevel !== undefined) {
+        // Exact difficulty filter: simple query, no stratification needed
+        sql = `
+          SELECT id, type, title, difficulty_level, topic, language_features, duration_seconds, created_at
+          FROM content_items
+          ${whereClause}
+          ORDER BY created_at
+          LIMIT $${paramIndex}
+        `;
+        params.push(limit);
+      } else {
+        // No difficulty filter: stratify across difficulty levels for even coverage
+        sql = `
+          SELECT id, type, title, difficulty_level, topic, language_features, duration_seconds, created_at
+          FROM (
+            SELECT *,
+              ROW_NUMBER() OVER (PARTITION BY FLOOR(difficulty_level) ORDER BY created_at) AS rn
+            FROM content_items
+            ${whereClause}
+          ) ranked
+          WHERE rn <= $${paramIndex}
+          ORDER BY difficulty_level, created_at
+        `;
+        // Divide limit evenly across 6 difficulty buckets, rounding up
+        params.push(Math.ceil(limit / 6));
+      }
 
       const result = await query(sql, params);
 
