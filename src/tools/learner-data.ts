@@ -198,7 +198,7 @@ export function registerLearnerDataTools(server: McpServer): void {
     async ({ explored, limit }) => {
       let sql = `
         SELECT
-          id, word, context_sentence, definition, examples,
+          id, word, context, definition, examples,
           grammar_info, is_explored, created_at
         FROM mystery_items
       `;
@@ -310,7 +310,7 @@ export function registerLearnerDataTools(server: McpServer): void {
     async ({ limit }) => {
       const result = await query(
         `SELECT
-          id, narrative_text, stats, created_at
+          id, narrative, reflection, stats, created_at
         FROM learning_narratives
         ORDER BY created_at DESC
         LIMIT $1`,
