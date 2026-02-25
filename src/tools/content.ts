@@ -14,9 +14,9 @@ export function registerContentTools(server: McpServer): void {
         difficultyLevel: z
           .number()
           .min(1.0)
-          .max(6.0)
+          .max(9.5)
           .optional()
-          .describe('Filter by exact difficulty level (1.0–6.0)'),
+          .describe('Filter by exact difficulty level (1.0–9.5)'),
         topic: z.string().optional().describe('Filter by topic (partial match, case-insensitive)'),
         type: z.enum(['audio', 'text']).optional().describe('Filter by content type'),
         limit: z.number().min(1).default(50).describe('Max results to return (default 50)'),
